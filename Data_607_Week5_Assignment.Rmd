@@ -1,0 +1,213 @@
+---
+title: "Data_607_Week5_Assignment"
+author: "Mohamed Hassan-El Serafi"
+date: "2023-02-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(data.table)
+```
+
+## Importing Dataset
+
+To import the CSV file, I used readr. The file is saved as Arrival_Delays_Data.
+
+
+```{r}
+df <- read_csv("~/Documents/Arrival_Delays_Data.csv")
+df
+```
+```{r}
+glimpse(df)
+```
+## Removing NAs
+
+I removed the row of NAs that separated Alaska and Am West Airlines:
+
+```{r}
+df <- df[rowSums(is.na(df)) != ncol(df), ]
+df
+```
+
+## Renaming Columns
+
+I renamed the first and second columns to Airline and Arrival_Status, respectively:
+
+```{r}
+colnames(df) [1] <- "Airline"
+colnames(df) [2] <- "Arrival_Status"
+```
+
+I filled in the remaining NAs with the Airline representing delayed arrival flights:
+
+```{r}
+df[c(2,4),1] <- df[c(1,3),1]
+df
+```
+
+## Using pivot_longer()
+
+To change the table wide to long, I used pivot_longer(), renaming the cities as Destination and values to Total Number of Flights:
+
+```{r}
+df_longer <- df %>%
+  pivot_longer(cols = c(3:7), names_to = "Destination", values_to = "Total_Number_of_Flights")
+df_longer
+```
+
+I stored the arrival delays into a new variable, df_delays, with the total number of delayed flights in descending order:
+
+```{r}
+df_delays <- df_longer %>%
+  filter(Arrival_Status == "delayed") %>%
+  group_by(Destination) %>%
+  arrange(desc(Total_Number_of_Flights))
+df_delays
+```
+## Average Number of Delays for Each Airline:
+
+
+```{r}
+mean_delays <- df_delays %>%
+  group_by(Airline) %>%
+  summarise(Average_Delays = round(mean(Total_Number_of_Flights)), Number_of_Flights = n()) %>%
+  arrange(desc(Average_Delays))
+mean_delays
+```
+
+## Using pivot_wider()
+
+I used pivot_wider in order to separate the arrival ontime and delay data. I stored the results in a new variable, dfdelays_ontime:
+
+
+```{r}
+dfdelays_ontime <- df_longer %>%
+  pivot_wider(names_from = Arrival_Status, values_from = Total_Number_of_Flights)
+dfdelays_ontime
+```
+
+## Renaming Column Name:
+
+```{r}
+colnames(dfdelays_ontime) [3] = "on_time"
+```
+
+
+## Analyzing Flight Percentages
+
+I transformed the arrival on-time and delay data into percentages for each city, using kable to format the newly created table: 
+
+
+```{r}
+flight_percentages <- dfdelays_ontime %>% 
+  mutate(total = delayed + on_time,
+         On_Time_Percentage = round(on_time/total*100),
+         Delayed_Percentage = round(delayed/total*100)) %>%
+  arrange(desc(Delayed_Percentage))
+
+knitr::kable(flight_percentages, "pipe", align=c("l", "c", "c"))
+```
+
+
+## Arrival Ontime Percentages
+
+Looking at ontime and delay percentages separately:
+
+```{r}
+Arrival_Ontime <- flight_percentages %>%
+  select(Airline, Destination, On_Time_Percentage) %>%
+  arrange(desc(On_Time_Percentage))
+knitr::kable(Arrival_Ontime, "pipe", align=c("l", "c", "c"))
+```
+## Barplot of Arrival Ontime Percentages for each airline and city
+
+```{r}
+ggplot(Arrival_Ontime, aes(x=Destination, y=On_Time_Percentage, fill=Airline)) +
+    geom_bar(stat='identity', position='dodge', width=0.7) +
+  theme_minimal()
+```
+
+## Arrival Delay Percentages
+
+```{r}
+Arrival_Delayed <- flight_percentages %>%
+  select(Airline, Destination, Delayed_Percentage) %>%
+  arrange(desc(Delayed_Percentage))
+knitr::kable(Arrival_Delayed, "pipe", align=c("l", "c", "c"))
+```
+
+## Barplot of Arrival Delay Percentages
+
+```{r}
+ggplot(Arrival_Delayed, aes(x=Destination, y=Delayed_Percentage, fill=Airline)) +
+    geom_bar(stat='identity', position='dodge') +
+  theme_minimal()
+```
+
+## Further Analysis of Arrival Ontime and Delay Data
+
+I looked at the arrival ontime and delay data summary of each Airline, creating a boxplot that compares each Airline:
+
+## Alaska Airlines Delay Summary
+
+
+```{r}
+Arrival_Delayed %>% 
+  filter(Airline == "ALASKA") %>% 
+  select(Delayed_Percentage) %>% 
+  summary()
+```
+
+## AM West Airlines Delay Summary
+
+
+```{r}
+Arrival_Delayed %>% 
+  filter(Airline == "AM WEST") %>% 
+  select(Delayed_Percentage) %>% 
+  summary()
+```
+
+
+## Arrival Delay Boxplot
+
+```{r}
+ggplot(Arrival_Delayed, aes(Airline, Delayed_Percentage)) + 
+  geom_boxplot()
+```
+
+## Alaska Airlines Ontime Summary
+
+```{r}
+Arrival_Ontime %>% 
+  filter(Airline == "ALASKA") %>% 
+  select(On_Time_Percentage) %>% 
+  summary()
+```
+## Am West Ontime Summary
+
+```{r}
+Arrival_Ontime %>% 
+  filter(Airline == "AM WEST") %>% 
+  select(On_Time_Percentage) %>% 
+  summary()
+```
+
+## Arrival Ontime Boxplot
+
+
+```{r}
+ggplot(Arrival_Ontime, aes(Airline, On_Time_Percentage)) + 
+  geom_boxplot()
+```
+
+
+## Conclusion
+
+When comparing the arrival on-time and delay performances between Alaska and Am West Airlines, Alaska performed better than Am West overall. Alaska has fewer delays than Am West, with an average of 11% compared to Am West which has an average of 17%. When comparing the on-time and delay performance of each city, each Airline's highest average of delays and lowest arrival on-time performance occurred in San Francisco, which could indicate that its airport terminal may have a high frequency of plane traffic coming in and out of the city. Conversely, the highest average of ontime performance and lowest average of delays each airline occurred in Phoenix, which could indicate that there is less plane traffic in that city.
